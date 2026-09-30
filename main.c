@@ -3,6 +3,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <argp.h>
+#include <ncurses.h>
 #include "json-parser/json.h"
 
 
@@ -71,6 +72,19 @@ static size_t writeCurlResponse(char* contents, size_t size, size_t nmemb, void*
   mem->size += realsize;
   mem->memory[mem->size] = 0;
   return realsize;
+}
+
+static WINDOW *createWindow(int height, int width, int starty, int startx) {
+  WINDOW* localWin = newwin(height, width, starty, startx);
+  box(localWin, 0, 0);
+  wrefresh(localWin);
+  return localWin;
+}
+
+static void destroyWindow(WINDOW* localWin) {
+  wborder(localWin, ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ');
+  wrefresh(localWin);
+  delwin(localWin);
 }
 
 
@@ -164,9 +178,12 @@ int main(int argc, char** argv) {
   buf.memory = malloc(1);
   buf.size = 0;
 
+
+
   arguments.category = "";
   arguments.search = "";
   arguments.list = 0;
+
 
   argp_parse(&argp, argc, argv, 0, 0, &arguments);
 
