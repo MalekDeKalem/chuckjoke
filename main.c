@@ -14,6 +14,10 @@
 #define URL_BUFSIZE 64
 
 
+
+#define KEY_Q 113
+
+
 typedef struct {
   char* memory;
   size_t size;
@@ -159,6 +163,15 @@ static char* getCategoryList(CURL* curl, CURLcode* res, MemBuffer* buf) {
   return categoryList;
 }
 
+void keyHandler(int key) {
+  switch (key) {
+    case KEY_RESIZE:
+      break;
+    default:
+      printf("Key: %d\n", key);
+  }
+}
+
 
 int main(int argc, char** argv) {
   CURL* curl;
@@ -193,7 +206,21 @@ int main(int argc, char** argv) {
       char* joke = getRandomFromCategory(curl, &res, &buf, arguments.category);
       printf("%s\n", joke);
     } else if (strlen(arguments.search) > 0) {
-      printf("Not yet implemented\n");
+      int startx, starty, width, height;
+      initscr();
+      height = LINES;
+      width = COLS;
+      startx = 0;
+      starty = 0;
+      int c;
+      WINDOW* win = createWindow(height, width, starty, startx);
+      wborder(win, '|', '|', '-', '-', '+', '+', '+', '+');
+      while ((c = wgetch(win)) != KEY_Q) {
+        keyHandler(c);
+      }
+      destroyWindow(win);
+      endwin();
+      printf("Starting search\n");
     } else if (arguments.list) {
       getCategoryList(curl, &res, &buf);
       printf("%s\n", categoryList);
