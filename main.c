@@ -28,6 +28,7 @@ typedef struct {
 
 typedef struct {
   char** strs;
+  size_t ptr;
   size_t size;
   size_t capacity;
 } SearchVec;
@@ -37,10 +38,11 @@ typedef struct {
 SearchVec* createSearchVec() {
   SearchVec* res = (SearchVec*)malloc(sizeof(SearchVec));
   res->size = 0;
+  res->ptr = 0;
   res->capacity = 16;
-  res->strs = (char**)malloc(sizeof(char**));
+  res->strs = malloc(res->capacity * sizeof(char*));
 
-  for (int i = 0; i < res->capacity; i++) {
+  for (size_t i = 0; i < res->capacity; i++) {
     res->strs[i] = (char*)malloc(sizeof(char) * JOKE_SIZE);
   }
 
@@ -54,11 +56,11 @@ void pushSearchVec(SearchVec* vec, char* searchRes) {
     vec->strs = (char**)realloc(vec->strs, vec->capacity * sizeof(char*));
   }
 
-  vec->strs[vec->size] = searchRes;
+  vec->strs[vec->size++] = searchRes;
 }
 
 void destructSearchVec(SearchVec* vec) {
-  for (int i = 0; i < vec->capacity; i++) {
+  for (size_t i = 0; i < vec->capacity; i++) {
     free(vec->strs[i]);
   }
   free(vec);
@@ -206,7 +208,7 @@ static char* getCategoryList(CURL* curl, CURLcode* res, MemBuffer* buf) {
   return categoryList;
 }
 
-static char* getSearchResults(CURL* curl, CURLcode* res, MemBuffer* buf, char* searchTerm) {
+static SearchVec* getSearchResults(CURL* curl, CURLcode* res, MemBuffer* buf, char* searchTerm) {
   char urlbuf[URL_BUFSIZE];
   snprintf(urlbuf, sizeof(urlbuf), "%s%s", "https://api.chucknorris.io/jokes/search?query=", searchTerm);
   curl_easy_setopt(curl, CURLOPT_URL, urlbuf);
@@ -230,11 +232,11 @@ static char* getSearchResults(CURL* curl, CURLcode* res, MemBuffer* buf, char* s
   SearchVec* v = createSearchVec();
 
   for (int i = 0; i < length; i++) {
-    printf("Joke number %ld: %s\n",length-5, val->u.object.values[1].value->u.array.values[i]->u.object.values[6].value->u.string.ptr);
     pushSearchVec(v, val->u.object.values[1].value->u.array.values[i]->u.object.values[6].value->u.string.ptr);
   }
 
-  return "Hello world";
+
+  return v;
 }
 
 void keyHandler(int key) {
@@ -245,6 +247,28 @@ void keyHandler(int key) {
       printf("Key: %d\n", key);
   }
 }
+
+
+void drawScreen(SearchVec* vec) {
+  initscr();
+  int startx, starty, width, height;
+
+  
+  height = LINES;
+  width = COLS;
+  startx = 0;
+  starty = 0;
+  int c;
+  WINDOW* win = createWindow(height, width, starty, startx);
+  wborder(win, '|', '|', '-', '-', '+', '+', '+', '+');
+  wrefresh(win);
+  while ((c = wgetch(win)) != KEY_Q) {
+    keyHandler(c);
+  }
+
+  endwin();
+  destroyWindow(win);
+ }
 
 
 int main(int argc, char** argv) {
@@ -280,26 +304,9 @@ int main(int argc, char** argv) {
       char* joke = getRandomFromCategory(curl, &res, &buf, arguments.category);
       printf("%s\n", joke);
     } else if (strlen(arguments.search) > 0) {
-      /*
-      int startx, starty, width, height;
-      initscr();
-      height = LINES;
-      width = COLS;
-      startx = 0;
-      starty = 0;
-      int c;
-      char mesg[] = "This is a message";
-      WINDOW* win = createWindow(height, width, starty, startx);
-      wborder(win, '|', '|', '-', '-', '+', '+', '+', '+');
-      mvwprintw(win, LINES/2, (COLS-strlen(mesg))/2, "%s", mesg);
-      wrefresh(win);
-      while ((c = wgetch(win)) != KEY_Q) {
-        keyHandler(c);
-      }
-      destroyWindow(win);
-      endwin();
-      */
-      getSearchResults(curl, &res, &buf, arguments.search);
+     endwin();
+      SearchVec* v = getSearchResults(curl, &res, &buf, arguments.search);
+      drawScreen(v);
     } else if (arguments.list) {
       getCategoryList(curl, &res, &buf);
       printf("%s\n", categoryList);
