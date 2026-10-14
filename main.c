@@ -261,6 +261,8 @@ void drawScreen(SearchVec* vec) {
   int c;
   WINDOW* win = createWindow(height, width, starty, startx);
   wborder(win, '|', '|', '-', '-', '+', '+', '+', '+');
+  wmove(win, 15, 0);
+  whline(win, ACS_HLINE, width);
   wrefresh(win);
   while ((c = wgetch(win)) != KEY_Q) {
     keyHandler(c);
