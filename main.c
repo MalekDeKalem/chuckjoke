@@ -18,6 +18,8 @@
 
 
 #define KEY_Q 113
+#define KEY_UP_ARROW 91
+#define KEY_DOWN_ARROW 27
 
 
 typedef struct {
@@ -239,18 +241,44 @@ static SearchVec* getSearchResults(CURL* curl, CURLcode* res, MemBuffer* buf, ch
   return v;
 }
 
-void keyHandler(int key) {
+void keyHandler(int key, SearchVec* vec) {
   switch (key) {
     case KEY_RESIZE:
       break;
+    case KEY_UP_ARROW:
+      if (vec->ptr > 0) {
+        vec->ptr--;
+      }
+      break;
+    case KEY_DOWN_ARROW:
+      if (vec->ptr < vec->size) {
+        vec->ptr++;
+      }
+      break;
     default:
-      printf("Key: %d\n", key);
+      break;
   }
 }
 
 
+void update(WINDOW *win, SearchVec* vec) {
+  int c = wgetch(win);
+  keyHandler(c, vec);
+}
+
+ void drawJokeList(WINDOW *win, SearchVec* vec) {
+   wmove(win, 16, 0);
+   for (size_t i = 0; i < vec->size; i++) {
+     wprintw(win, "%s\n", vec->strs[i]);
+   }
+   wmove(win, 0, 0);
+   wrefresh(win);
+ }
+
+
 void drawScreen(SearchVec* vec) {
   initscr();
+  noecho();
   int startx, starty, width, height;
 
   
@@ -264,8 +292,9 @@ void drawScreen(SearchVec* vec) {
   wmove(win, 15, 0);
   whline(win, ACS_HLINE, width);
   wrefresh(win);
+  drawJokeList(win, vec);
   while ((c = wgetch(win)) != KEY_Q) {
-    keyHandler(c);
+    update(win, vec);
   }
 
   endwin();
@@ -306,9 +335,9 @@ int main(int argc, char** argv) {
       char* joke = getRandomFromCategory(curl, &res, &buf, arguments.category);
       printf("%s\n", joke);
     } else if (strlen(arguments.search) > 0) {
-     endwin();
       SearchVec* v = getSearchResults(curl, &res, &buf, arguments.search);
       drawScreen(v);
+      destructSearchVec(v);
     } else if (arguments.list) {
       getCategoryList(curl, &res, &buf);
       printf("%s\n", categoryList);
