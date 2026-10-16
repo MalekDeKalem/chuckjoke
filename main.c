@@ -21,6 +21,8 @@
 #define KEY_UP_ARROW 91
 #define KEY_DOWN_ARROW 27
 
+#define SELECT_PAIR 1
+
 
 typedef struct {
   char* memory;
@@ -233,7 +235,7 @@ static SearchVec* getSearchResults(CURL* curl, CURLcode* res, MemBuffer* buf, ch
 
   SearchVec* v = createSearchVec();
 
-  for (int i = 0; i < length; i++) {
+  for (size_t i = 0; i < length; i++) {
     pushSearchVec(v, val->u.object.values[1].value->u.array.values[i]->u.object.values[6].value->u.string.ptr);
   }
 
@@ -267,10 +269,26 @@ void update(WINDOW *win, SearchVec* vec) {
 }
 
  void drawJokeList(WINDOW *win, SearchVec* vec) {
+
+   if (has_colors() == FALSE) {
+     endwin();
+     destructSearchVec(vec);
+     destroyWindow(win);
+     exit(1);
+   }
+
    wmove(win, 16, 0);
+
+  
+   start_color();
+   init_pair(SELECT_PAIR, COLOR_RED, COLOR_GREEN);
+   wattron(win, COLOR_PAIR(SELECT_PAIR));
+
    for (size_t i = 0; i < vec->size; i++) {
      wprintw(win, "%s\n", vec->strs[i]);
    }
+
+   wattroff(win, COLOR_PAIR(1));
    wmove(win, 0, 0);
    wrefresh(win);
  }
@@ -279,6 +297,7 @@ void update(WINDOW *win, SearchVec* vec) {
 void drawScreen(SearchVec* vec) {
   initscr();
   noecho();
+  cbreak();
   int startx, starty, width, height;
 
   
@@ -299,6 +318,7 @@ void drawScreen(SearchVec* vec) {
 
   endwin();
   destroyWindow(win);
+  destructSearchVec(vec);
  }
 
 
@@ -337,7 +357,6 @@ int main(int argc, char** argv) {
     } else if (strlen(arguments.search) > 0) {
       SearchVec* v = getSearchResults(curl, &res, &buf, arguments.search);
       drawScreen(v);
-      destructSearchVec(v);
     } else if (arguments.list) {
       getCategoryList(curl, &res, &buf);
       printf("%s\n", categoryList);
