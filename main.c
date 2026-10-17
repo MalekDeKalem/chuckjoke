@@ -13,6 +13,7 @@
 #define USERAGENT "libcurl/1.0"
 #define CATEGORY_LIST_BUFSIZE 300
 #define URL_BUFSIZE 64
+#define SLICE 10
 
 #define JOKE_SIZE 100
 
@@ -38,6 +39,9 @@ typedef struct {
 } SearchVec;
 
 
+void drawJokeList(WINDOW*, SearchVec*);
+
+
 
 SearchVec* createSearchVec() {
   SearchVec* res = (SearchVec*)malloc(sizeof(SearchVec));
@@ -46,9 +50,6 @@ SearchVec* createSearchVec() {
   res->capacity = 16;
   res->strs = malloc(res->capacity * sizeof(char*));
 
-  for (size_t i = 0; i < res->capacity; i++) {
-    res->strs[i] = (char*)malloc(sizeof(char) * JOKE_SIZE);
-  }
 
   return res;
 }
@@ -60,13 +61,14 @@ void pushSearchVec(SearchVec* vec, char* searchRes) {
     vec->strs = (char**)realloc(vec->strs, vec->capacity * sizeof(char*));
   }
 
-  vec->strs[vec->size++] = searchRes;
+  vec->strs[vec->size++] = strdup(searchRes);
 }
 
 void destructSearchVec(SearchVec* vec) {
   for (size_t i = 0; i < vec->capacity; i++) {
     free(vec->strs[i]);
   }
+  free(vec->strs);
   free(vec);
 }
 
@@ -243,77 +245,99 @@ static SearchVec* getSearchResults(CURL* curl, CURLcode* res, MemBuffer* buf, ch
   return v;
 }
 
-void keyHandler(int key, SearchVec* vec) {
-  switch (key) {
+void update(WINDOW *win, SearchVec* vec, bool* shouldClose) {
+  int c = wgetch(win);
+  keypad(win, true);
+  printf("Key: %d", c);
+  switch (c) {
+    
     case KEY_RESIZE:
       break;
-    case KEY_UP_ARROW:
-      if (vec->ptr > 0) {
-        vec->ptr--;
-      }
+    case KEY_UP:
+        if (vec->ptr > 0) {
+          vec->ptr--;
+          drawJokeList(win, vec);
+        }
       break;
-    case KEY_DOWN_ARROW:
-      if (vec->ptr < vec->size) {
-        vec->ptr++;
-      }
+    case KEY_DOWN:
+        if (vec->ptr + 1 < vec->size) {
+          vec->ptr++;
+          drawJokeList(win, vec);
+        }
+      break;
+    case KEY_Q:
+      *shouldClose = true;
       break;
     default:
       break;
   }
-}
-
-
-void update(WINDOW *win, SearchVec* vec) {
-  int c = wgetch(win);
-  keyHandler(c, vec);
+    
 }
 
  void drawJokeList(WINDOW *win, SearchVec* vec) {
+   int height, width;
+   getmaxyx(win, height, width);
 
-   if (has_colors() == FALSE) {
-     endwin();
-     destructSearchVec(vec);
-     destroyWindow(win);
-     exit(1);
+  for (int y = 16; y < height - 1; y++) {
+    mvwhline(win, y, 1, ' ', width - 2);
+  }
+
+  size_t start = (vec->ptr / SLICE) * SLICE;
+
+  for (size_t i = 0; i < SLICE; i++) {
+    int y = 16 + (int)i;
+    wmove(win, y, 1);
+
+    size_t idx = start + i;
+
+    if (idx >= vec->size) break;
+
+    if (idx == vec->ptr) wattron(win, COLOR_PAIR(SELECT_PAIR));
+    waddnstr(win, vec->strs[idx], width - 2);
+    if (idx == vec->ptr) wattroff(win, COLOR_PAIR(SELECT_PAIR));
+
    }
 
-   wmove(win, 16, 0);
-
-  
-   start_color();
-   init_pair(SELECT_PAIR, COLOR_RED, COLOR_GREEN);
-   wattron(win, COLOR_PAIR(SELECT_PAIR));
-
-   for (size_t i = 0; i < vec->size; i++) {
-     wprintw(win, "%s\n", vec->strs[i]);
-   }
-
-   wattroff(win, COLOR_PAIR(1));
-   wmove(win, 0, 0);
-   wrefresh(win);
+  wrefresh(win);
  }
 
 
 void drawScreen(SearchVec* vec) {
   initscr();
+  keypad(stdscr, TRUE);
   noecho();
   cbreak();
   int startx, starty, width, height;
 
-  
+
+
   height = LINES;
   width = COLS;
   startx = 0;
   starty = 0;
-  int c;
   WINDOW* win = createWindow(height, width, starty, startx);
+
+  if (!has_colors()) {
+    endwin();
+    destructSearchVec(vec);
+    destroyWindow(win);
+    exit(1);
+  } else {
+    start_color();
+    init_pair(SELECT_PAIR, COLOR_RED, COLOR_GREEN);
+  }
+
+  
   wborder(win, '|', '|', '-', '-', '+', '+', '+', '+');
   wmove(win, 15, 0);
   whline(win, ACS_HLINE, width);
   wrefresh(win);
   drawJokeList(win, vec);
-  while ((c = wgetch(win)) != KEY_Q) {
-    update(win, vec);
+
+  bool shouldClose = false;
+  
+  while (!shouldClose) {
+    update(win, vec, &shouldClose);
   }
 
   endwin();
